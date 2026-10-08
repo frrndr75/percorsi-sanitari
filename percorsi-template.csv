@@ -1,0 +1,7 @@
+Percorso,NomePercorso,OrdineTappa,Tappa,Indirizzo,Attivita
+H,Percorso H,1,Fossombrone,"Fossombrone, PU",Partenza: carico documenti ematici
+H,Percorso H,1,Fossombrone,"Fossombrone, PU",Verifica presenza di tutto il materiale prima di partire
+H,Percorso H,2,Mondavio,"Mondavio, PU",Consegna 2 bussolotti per ritiro prelievi
+H,Percorso H,2,Mondavio,"Mondavio, PU",Consegna e ritiro documenti
+X,Percorso X,1,Nome tappa 1,"Indirizzo completo, citta",Attivita da fare in questa tappa
+X,Percorso X,2,Nome tappa 2,"Indirizzo completo, citta",Attivita da fare in questa tappa

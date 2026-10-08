@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Percorsi Sanitari</title>
+<style>
+  /* Font: Space Grotesk per i titoli, Inter per il testo, JetBrains Mono per codici/numeri/dati */
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+
+  /* Palette colori dell'app, definita una volta sola qui: cambiando questi valori
+     cambia il colore in tutta l'app (non serve modificare le regole sotto). */
+  :root{
+    --bg: #12161d;          /* sfondo generale (quasi nero) */
+    --surface: #1b2230;     /* sfondo delle card */
+    --surface-2: #232c3d;   /* sfondo elementi secondari (badge, pulsanti neutri) */
+    --line: #2c3547;        /* colore dei bordi/separatori */
+    --amber: #e8a33d;       /* colore "azione/attivo" (tappa corrente, pulsante Fatto) */
+    --amber-dim: #6b5730;   /* variante spenta dell'ambra, per bordi */
+    --teal: #4f9c85;        /* colore "completato" */
+    --teal-dim: #2c473e;    /* variante spenta del teal, per bordi/sfondi */
+    --text: #f3f1ea;        /* testo principale (bianco caldo) */
+    --text-muted: #8a93a3;  /* testo secondario */
+    --text-faint: #4f5866;  /* testo/icone quasi invisibili (elementi bloccati) */
+    --danger: #d96a5a;      /* colore errori (es. CSV non valido) */
+    --radius: 14px;         /* raggio arrotondamento standard delle card */
+  }
+  /* reset di base: nessun margine/padding di default, box-sizing coerente */
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family:'Inter',sans-serif;
+    display:flex;
+    justify-content:center;
+    min-height:100vh;
+  }
+  /* #app = il "telefono": larghezza massima 480px, il resto dello schermo (su desktop) resta vuoto */
+  #app{
+    width:100%;
+    max-width:480px;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    overflow:hidden;
+  }
+
+  /* ---------- TOP BAR ---------- */
+  .topbar{
+    padding:22px 20px 16px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .back-btn{
+    width:36px; height:36px;
+    border-radius:10px;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--text);
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .back-btn svg{ width:18px; height:18px; }
+  .topbar-title{ display:flex; flex-direction:column; gap:2px; }
+  .topbar-eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    color:var(--text-muted);
+    text-transform:uppercase;
+  }
+  .topbar-main{ font-family:'Space Grotesk',sans-serif; font-size:19px; font-weight:600; }
+
+  /* ---------- SCREENS ----------
+     L'app ha 2 "schermate" sovrapposte (home e dettaglio percorso).
+     Sono impilate una sopra l'altra (position:absolute su .screen dentro
+     #app che ha position:relative) e si passa dall'una all'altra
+     aggiungendo/togliendo la classe .hidden via JavaScript. */
+  .screen{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column;
+    background:var(--bg);
+    transition: transform 0.32s cubic-bezier(.4,0,.2,1), opacity 0.32s ease;
+  }
+  .screen.hidden{ transform: translateX(24px); opacity:0; pointer-events:none; }
+
+  .scroll{ flex:1; overflow-y:auto; padding:18px 20px 40px; }
+
+  /* ---------- HOME: LISTA PERCORSI ---------- */
+  .home-hero{
+    padding:26px 20px 8px;
+  }
+  .home-hero-eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--amber); margin-bottom:8px;
+  }
+  .home-hero-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:26px; font-weight:700; line-height:1.15;
+    margin-bottom:6px;
+  }
+  .home-hero-sub{ font-size:13.5px; color:var(--text-muted); line-height:1.5; }
+
+  /* Riquadro "Carica CSV" in cima alla home */
+  .upload-box{
+    margin-top:18px;
+    background:var(--surface);
+    border:1px dashed var(--line);
+    border-radius:var(--radius);
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .upload-box-title{ font-size:13px; font-weight:600; }
+  .upload-box-title span{ color:var(--amber); font-weight:500; }
+  .upload-box-sub{ font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+  .btn-upload{ background:var(--surface-2); flex-shrink:0; }
+
+  /* Riga "Seleziona per eliminare" / barra attiva di selezione */
+  .manage-row{ display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-top:10px; }
+  .manage-link{
+    background:none; border:none;
+    font-family:'Inter',sans-serif; font-size:11.5px;
+    color:var(--text-faint);
+    text-decoration:underline;
+    cursor:pointer;
+    padding:4px;
+  }
+  .manage-link:hover{ color:var(--text-muted); }
+  .selection-bar{
+    width:100%;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:10px 12px;
+  }
+  .selection-count{ font-size:12.5px; color:var(--text-muted); flex:1; }
+  .selection-actions{ display:flex; gap:8px; flex-shrink:0; }
+  .btn-small{
+    font-family:'Inter',sans-serif; font-size:12px; font-weight:600;
+    padding:7px 11px; border-radius:8px; border:1px solid var(--line);
+    background:var(--surface-2); color:var(--text); cursor:pointer;
+  }
+  .btn-small-danger{ background:rgba(217,106,90,0.12); border-color:rgba(217,106,90,0.4); color:var(--danger); }
+  .btn-small:disabled{ opacity:0.4; cursor:default; }
+
+  /* Checkbox mostrata sulle card in modalità selezione (stesso stile della spunta attività) */
+  .route-select-box{
+    width:22px; height:22px; border-radius:7px;
+    border:2px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+    transition: all 0.15s ease;
+  }
+  .route-select-box svg{ width:13px; height:13px; opacity:0; color:#0d1a16; }
+  .route-card.selected .route-select-box{ background:var(--amber); border-color:var(--amber); }
+  .route-card.selected .route-select-box svg{ opacity:1; }
+  .route-card.selection-mode{ cursor:pointer; }
+  /* Messaggio di errore mostrato se il CSV caricato non è nel formato corretto */
+  .csv-error{
+    margin-top:10px;
+    font-size:12px;
+    color:var(--danger);
+    background:rgba(217,106,90,0.1);
+    border:1px solid rgba(217,106,90,0.3);
+    padding:10px 12px;
+    border-radius:9px;
+  }
+
+  /* Card di un singolo percorso nella lista home (es. "Percorso H") */
+  .route-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius: var(--radius);
+    padding:18px;
+    margin-top:14px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:16px;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .route-card:active{ transform: scale(0.98); }
+  .route-card:hover{ border-color:#3a4560; }
+  .route-badge{
+    width:52px; height:52px; border-radius:12px;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:22px; font-weight:700;
+    color:var(--amber);
+    flex-shrink:0;
+  }
+  .route-info{ flex:1; min-width:0; }
+  .route-name{ font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:600; margin-bottom:3px; }
+  .route-meta{ font-size:12.5px; color:var(--text-muted); }
+  .route-progress-pill{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--text-muted);
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    padding:4px 8px;
+    border-radius:20px;
+    flex-shrink:0;
+  }
+  .route-progress-pill.active{ color:var(--amber); border-color:var(--amber-dim); }
+  .route-progress-pill.done{ color:var(--teal); border-color:var(--teal-dim); }
+
+  /* Messaggio mostrato in home quando non ci sono percorsi salvati */
+  .empty-state{
+    margin-top:36px;
+    text-align:center;
+    padding:20px;
+    color:var(--text-faint);
+  }
+  .empty-state-title{ font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600; color:var(--text-muted); margin-bottom:6px; }
+  .empty-state-sub{ font-size:12.5px; }
+
+  /* ---------- DETTAGLIO PERCORSO: CATENA DI TAPPE ----------
+     Ogni tappa (.stop) ha un "pallino" numerato (.stop-dot) collegato al
+     successivo da una lineetta verticale (.stop-connector), come una
+     catena di custodia. Ogni tappa può avere 3 stati, applicati come
+     classe CSS: "locked" (bloccata, in attesa), "active" (tappa corrente,
+     interagibile) o "done" (completata). */
+  .route-summary{
+    padding:20px 20px 4px;
+  }
+  .route-summary-title{
+    font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700;
+  }
+  .route-summary-sub{ font-size:13px; color:var(--text-muted); margin-top:4px; }
+
+  .chain{ padding:26px 20px 40px; }
+  .stop{
+    display:flex;
+    gap:16px;
+    position:relative;
+  }
+  .stop-rail{
+    display:flex; flex-direction:column; align-items:center;
+    flex-shrink:0;
+  }
+  /* Pallino numerato a sinistra di ogni tappa. Stile di default = bloccata */
+  .stop-dot{
+    width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px; font-weight:600;
+    border:2px solid var(--line);
+    background:var(--surface);
+    color:var(--text-faint);
+    flex-shrink:0;
+    z-index:1;
+    transition: all 0.25s ease;
+  }
+  .stop-dot.active{ border-color:var(--amber); color:var(--amber); background:#2a2113; box-shadow:0 0 0 4px rgba(232,163,61,0.12); }
+  .stop-dot.done{ border-color:var(--teal); background:var(--teal); color:#0d1a16; }
+  /* Linea verticale che collega una tappa alla successiva */
+  .stop-connector{
+    width:2px; flex:1;
+    background:var(--line);
+    margin:2px 0;
+    min-height:36px;
+  }
+  .stop-connector.filled{ background:var(--teal); } /* si "riempie" quando la tappa sopra è completata */
+  .stop-body{ flex:1; padding-bottom:34px; min-width:0; }
+  /* Card con i dettagli della tappa: sbiadita/grigia se bloccata, piena se attiva/completata */
+  .stop-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:16px;
+    opacity:0.45;
+    filter: grayscale(0.4);
+    transition: all 0.25s ease;
+  }
+  .stop-card.active{
+    opacity:1; filter:none;
+    border-color: var(--amber-dim);
+  }
+  .stop-card.done{ opacity:0.75; filter:none; border-color:var(--teal-dim); }
+
+  .stop-place{ font-family:'Space Grotesk',sans-serif; font-size:16.5px; font-weight:600; margin-bottom:2px; }
+  .stop-status{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--text-faint);
+    margin-bottom:10px;
+  }
+  .stop-status.active{ color:var(--amber); }
+  .stop-status.done{ color:var(--teal); }
+
+  .stop-tasks{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+  /* Riga di attività per tappe BLOCCATE: solo testo, non cliccabile */
+  .stop-task{
+    font-size:13px; color:var(--text); line-height:1.4;
+    display:flex; gap:10px; align-items:flex-start;
+  }
+  .stop-task::before{
+    content:"–";
+    color:var(--text-muted);
+    flex-shrink:0;
+  }
+  /* Riga di attività CLICCABILE (usata per la tappa attiva e per quelle già completate).
+     Il click su tutta la riga (non solo sul quadratino) è gestito in JS da toggleTask(). */
+  .stop-task-check{
+    display:flex; gap:10px; align-items:flex-start;
+    padding:8px 9px;
+    margin:0 -9px;
+    border-radius:9px;
+    cursor:pointer;
+    -webkit-user-select:none; user-select:none;
+    transition: background 0.15s ease;
+  }
+  .stop-task-check:active{ background:var(--surface-2); }
+  /* Il quadratino/checkbox vero e proprio (disegnato a mano, non un <input>) */
+  .task-checkbox{
+    width:19px; height:19px; border-radius:6px;
+    border:2px solid var(--line);
+    flex-shrink:0;
+    margin-top:1px;
+    display:flex; align-items:center; justify-content:center;
+    transition: all 0.15s ease;
+  }
+  .task-checkbox svg{ width:12px; height:12px; opacity:0; transition: opacity 0.1s ease; color:#0d1a16; }
+  /* Stato "spuntato": sfondo ambra pieno + spunta visibile + testo barrato */
+  .stop-task-check.checked .task-checkbox{ background:var(--amber); border-color:var(--amber); }
+  .stop-task-check.checked .task-checkbox svg{ opacity:1; }
+  .stop-task-check.checked .task-label{ color:var(--text-muted); text-decoration:line-through; text-decoration-color:var(--text-faint); }
+  /* Task di una tappa già completata: mostrate spuntate ma non più cliccabili */
+  .stop-task-check.locked-task{ cursor:default; }
+  .stop-task-check.locked-task .task-checkbox{ border-color:var(--line); }
+  .task-label{ font-size:13px; color:var(--text); line-height:1.4; padding-top:1px; }
+  /* Suggerimento mostrato sopra il pulsante "Fatto" finché non è tutto spuntato */
+  .tasks-hint{
+    font-size:11.5px; color:var(--text-faint);
+    margin:-4px 0 12px;
+  }
+  /* Pulsante "Fatto" disabilitato: grigio, non cliccabile, mostra il conteggio (es. "1/2") */
+  .btn-done.disabled{
+    background:var(--surface-2);
+    border-color:var(--line);
+    color:var(--text-faint);
+    cursor:default;
+  }
+  .btn-done.disabled:active{ transform:none; }
+
+  .stop-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  /* Stile base condiviso da tutti i pulsanti (Apri in Maps, Fatto, Confermato...) */
+  .btn{
+    font-family:'Inter',sans-serif;
+    font-size:13.5px; font-weight:600;
+    padding:10px 14px;
+    border-radius:9px;
+    border:1px solid var(--line);
+    background:var(--surface-2);
+    color:var(--text);
+    cursor:pointer;
+    display:flex; align-items:center; gap:7px;
+    transition: transform 0.1s ease, background 0.15s ease;
+  }
+  .btn:active{ transform:scale(0.96); }
+  .btn svg{ width:15px; height:15px; flex-shrink:0; }
+  .btn-maps{ background:var(--surface-2); }
+  .btn-maps:hover{ background:#2a3245; }
+  /* Pulsante "Fatto" attivo (ambra, ben visibile) */
+  .btn-done{
+    background: var(--amber);
+    border-color: var(--amber);
+    color:#241a08;
+  }
+  .btn-done:hover{ background:#f0ae4d; }
+  /* Etichetta "Confermato" mostrata al posto del pulsante una volta completata la tappa */
+  .btn-done-confirmed{
+    background: var(--teal-dim);
+    border-color: var(--teal-dim);
+    color: var(--teal);
+    cursor:default;
+  }
+
+  /* Nota con lucchetto mostrata sulle tappe ancora bloccate */
+  .locked-note{
+    font-size:12px; color:var(--text-faint);
+    margin-top:10px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .locked-note svg{ width:13px; height:13px; }
+
+  /* ---------- STATO "PERCORSO COMPLETATO" ---------- */
+  .complete-banner{
+    margin:0 20px 20px;
+    background: linear-gradient(135deg, var(--teal-dim), var(--surface));
+    border:1px solid var(--teal-dim);
+    border-radius: var(--radius);
+    padding:18px;
+    display:flex; align-items:center; gap:14px;
+  }
+  .complete-icon{
+    width:40px; height:40px; border-radius:50%;
+    background:var(--teal);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .complete-icon svg{ width:20px; height:20px; color:#0d1a16; }
+  .complete-text-title{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14.5px; }
+  .complete-text-sub{ font-size:12px; color:var(--text-muted); margin-top:2px; }
+
+  .offline-tag{
+    position:fixed; top:14px; right:14px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; letter-spacing:0.05em;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    color:var(--text-faint);
+    padding:5px 9px;
+    border-radius:20px;
+    display:none;
+    z-index:10;
+  }
+
+  ::-webkit-scrollbar{ width:0px; }
+</style>
+</head>
+<body>
+
+<!-- Contenitore principale: rappresenta lo schermo del telefono (max 480px) -->
+<div id="app">
+
+  <!-- SCHERMATA 1: HOME — lista dei percorsi disponibili.
+       Visibile di default (nessuna classe "hidden"). -->
+  <div class="screen" id="screen-home">
+    <div class="scroll">
+      <div class="home-hero">
+        <div class="home-hero-eyebrow">Trasporti sanitari · oggi</div>
+        <div class="home-hero-title">Seleziona il percorso</div>
+        <div class="home-hero-sub">Ogni tappa si sblocca solo dopo aver completato quella precedente.</div>
+      </div>
+
+      <!-- Box per caricare il file CSV con i percorsi (vedi handleCsvUpload in JS).
+           Il caricamento AGGIUNGE o AGGIORNA i percorsi presenti nel file, senza
+           cancellare gli altri percorsi già salvati (persistenza, vedi initApp). -->
+      <div class="upload-box" id="upload-box">
+        <div class="upload-box-text">
+          <div class="upload-box-title">Percorsi salvati: <span id="upload-status">caricamento…</span></div>
+          <div class="upload-box-sub">Il CSV aggiorna o aggiunge percorsi, non cancella gli altri · puoi selezionarne più di uno insieme</div>
+        </div>
+        <!-- il <label> "finto pulsante" apre il file picker collegato all'<input type="file"> nascosto.
+             L'attributo "multiple" permette di selezionare più file CSV in un colpo solo. -->
+        <label class="btn btn-upload" for="csv-input">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Carica CSV
+        </label>
+        <input type="file" id="csv-input" accept=".csv,text/csv" multiple style="display:none" onchange="handleCsvUpload(event)">
+      </div>
+      <!-- Riga di gestione percorsi: normalmente mostra "Seleziona per eliminare";
+           in modalità selezione mostra il conteggio e i pulsanti Elimina/Annulla.
+           Il contenuto viene generato da renderHome() in JS. -->
+      <div id="manage-row"></div>
+
+      <!-- Le card dei singoli percorsi vengono generate in JS da renderHome() -->
+      <div id="route-list"></div>
+    </div>
+  </div>
+
+  <!-- SCHERMATA 2: DETTAGLIO PERCORSO — la catena di tappe di un percorso.
+       Nascosta di default (classe "hidden"), viene mostrata da openRoute(). -->
+  <div class="screen hidden" id="screen-route">
+    <div class="topbar">
+      <!-- Freccia indietro: torna alla home -->
+      <div class="back-btn" onclick="goHome()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+      <div class="topbar-title">
+        <div class="topbar-eyebrow" id="route-eyebrow">Percorso</div>
+        <div class="topbar-main" id="route-title">—</div>
+      </div>
+    </div>
+    <div class="scroll">
+      <!-- Banner "percorso completato": popolato da renderRoute() solo a fine percorso -->
+      <div id="complete-banner-slot"></div>
+      <!-- Catena delle tappe: popolata da renderRoute() -->
+      <div class="chain" id="stop-chain"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ====================================================================
+   DATI: l'elenco dei percorsi.
+   Ogni percorso ha un id, un nome, e un elenco di tappe (stops).
+   Ogni tappa ha un luogo, un indirizzo (usato per aprire Google Maps)
+   e un elenco di attività (tasks) da spuntare una per una.
+
+   L'app NON parte con nessun percorso di esempio: alla primissima
+   apertura "routes" è vuoto, e resta vuoto finché non si carica almeno
+   un file CSV (vedi parseRoutesCsv più sotto). Da quel momento in poi
+   i percorsi caricati restano salvati (vedi STORAGE_KEY) anche
+   chiudendo e riaprendo la pagina.
+
+   NOTA IMPORTANTE SULLA PERSISTENZA: i percorsi vengono salvati nel
+   localStorage del browser (vedi saveRoutesToStorage/initApp più sotto).
+   E' una memoria legata al browser e al dispositivo specifico su cui viene
+   aperto questo file: sopravvive a refresh, chiusura della scheda e riavvio
+   del telefono/computer, ma NON si sincronizza automaticamente tra un
+   dispositivo e l'altro (es. telefono e computer restano indipendenti), e
+   viene persa se si cancellano manualmente i dati di navigazione del browser.
+   Funziona completamente offline: non serve connessione internet per salvare
+   o rileggere i percorsi, solo per aprire la navigazione su Google Maps.
+   ==================================================================== */
+
+// "routes" è l'elenco effettivamente usato dall'app. Parte vuoto:
+// initApp() lo riempie con i percorsi salvati in precedenza, se ce ne sono.
+let routes = [];
+
+/* ---------------- STATO DELL'APP ---------------- */
+// progress[routeId] = numero di tappe completate per quel percorso (0, 1, 2, ...)
+// Es: progress['H'] = 1 significa "la prima tappa di H è completata, la seconda è attiva"
+let progress = {};
+
+// taskProgress[routeId][indiceTappa] = array di true/false, uno per ogni attività di quella tappa
+// Es: taskProgress['H'][0] = [true, false] significa "prima attività di Fossombrone spuntata, la seconda no"
+let taskProgress = {};
+
+// Stato della modalità "seleziona per eliminare" nella home:
+// selectionMode = true quando l'utente sta scegliendo quali percorsi cancellare;
+// selectedIds contiene gli id dei percorsi attualmente spuntati in quella modalità.
+let selectionMode = false;
+let selectedIds = new Set();
+
+// Chiave usata per salvare/leggere l'elenco percorsi nello storage persistente del prototipo.
+// "false" (dato personale, non condiviso) perché sono i percorsi di lavoro di chi usa l'app.
+const STORAGE_KEY = 'routes-data';
+
+// Ricostruisce SOLO progress/taskProgress per i percorsi indicati (o per tutti se non
+// specificato), lasciando intatto lo stato di avanzamento degli altri percorsi già in corso.
+// Va richiamata quando un percorso viene aggiunto o aggiornato da un CSV.
+function resetProgressFor(routeIds){
+  routeIds.forEach(id => {
+    const r = routes.find(x => x.id === id);
+    if(!r) return;
+    progress[id] = 0;
+    taskProgress[id] = r.stops.map(stop => stop.tasks.map(() => false));
+  });
+}
+
+// Salva l'elenco percorsi attuale nel localStorage del browser, cosi' resta
+// disponibile anche chiudendo la scheda, ricaricando la pagina o riavviando
+// il telefono/computer. E' una memoria legata al browser e al dispositivo su
+// cui viene aperto il file (non è condivisa tra telefono e computer, e si
+// perde solo se si cancellano manualmente i dati del browser).
+function saveRoutesToStorage(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(routes));
+  } catch(err){
+    // può fallire in navigazione privata/anonima con storage bloccato, o se
+    // i dati superano il limite (di norma 5-10MB, ben oltre quanto serve qui)
+    console.error('Salvataggio percorsi fallito:', err);
+    showCsvError('Impossibile salvare i percorsi sul dispositivo (memoria del browser non disponibile).');
+  }
+}
+
+// Unisce un elenco di percorsi appena letto da un CSV con quelli già salvati:
+// - se un percorso con lo stesso id esiste già, viene AGGIORNATO (sovrascritto)
+// - se non esiste, viene AGGIUNTO
+// - i percorsi già presenti ma non citati nel nuovo CSV restano invariati
+// Questo è il comportamento richiesto: il CSV serve per aggiornamenti o per recuperare
+// un percorso, non per sostituire tutto l'elenco ogni volta.
+function mergeRoutes(newRoutes){
+  const touchedIds = [];
+  newRoutes.forEach(nr => {
+    const idx = routes.findIndex(r => r.id === nr.id);
+    if(idx !== -1){ routes[idx] = nr; }   // aggiorna percorso esistente
+    else { routes.push(nr); }              // aggiunge percorso nuovo
+    touchedIds.push(nr.id);
+  });
+  resetProgressFor(touchedIds); // solo i percorsi toccati ripartono da zero
+}
+
+// ---------------- SELEZIONE ED ELIMINAZIONE PERCORSI ----------------
+// Con molti percorsi ha senso poter cancellarne solo alcuni, non tutto
+// l'elenco: l'utente entra in "modalità selezione", spunta i percorsi da
+// eliminare (toggleRouteSelected), poi conferma (deleteSelectedRoutes).
+
+// Entra/esce dalla modalità selezione, svuotando eventuali selezioni precedenti
+function toggleSelectionMode(){
+  selectionMode = !selectionMode;
+  selectedIds.clear();
+  renderHome();
+}
+
+// Spunta/despunta un percorso nella modalità selezione (non apre il percorso)
+function toggleRouteSelected(id){
+  if(selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  renderHome();
+}
+
+// Seleziona tutti i percorsi in un colpo solo (comodo se si vuole svuotare tutto)
+function selectAllRoutes(){
+  routes.forEach(r => selectedIds.add(r.id));
+  renderHome();
+}
+
+// Elimina definitivamente solo i percorsi spuntati (dall'elenco, dallo stato
+// di avanzamento e dallo storage persistente). Gli altri percorsi non toccati
+// restano esattamente come erano.
+function deleteSelectedRoutes(){
+  if(selectedIds.size === 0) return;
+  const ok = confirm(`Eliminare ${selectedIds.size} percorso/i selezionato/i? Questa azione non si può annullare.`);
+  if(!ok) return;
+
+  routes = routes.filter(r => !selectedIds.has(r.id));
+  selectedIds.forEach(id => { delete progress[id]; delete taskProgress[id]; });
+  selectedIds.clear();
+  selectionMode = false;
+
+  saveRoutesToStorage(); // salva l'elenco ridotto: la cancellazione è persistente
+
+  renderHome();
+}
+
+// Avvio dell'app: prova a leggere i percorsi salvati in precedenza dal
+// localStorage del browser. Se non c'è nulla di salvato (prima apertura in
+// assoluto su questo dispositivo/browser, oppure dopo aver eliminato tutto),
+// "routes" resta vuoto — nessun esempio precompilato.
+function initApp(){
+  try{
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if(stored){
+      routes = JSON.parse(stored);
+    }
+  } catch(err){
+    // localStorage non disponibile (es. navigazione privata): si resta con l'elenco vuoto
+    console.error('Lettura percorsi salvati fallita:', err);
+  }
+  document.getElementById('upload-status').textContent =
+    routes.length === 0 ? 'nessuno' : `${routes.length} percorsi salvati`;
+  resetProgressFor(routes.map(r => r.id));
+  renderHome();
+}
+
+// id del percorso attualmente aperto nella schermata di dettaglio (null = nessuno, siamo in home)
+let currentRouteId = null;
+
+// ---------------- CSV: parsing e caricamento ----------------
+// Formato atteso (intestazione obbligatoria, esattamente questi nomi colonna):
+// Percorso,NomePercorso,OrdineTappa,Tappa,Indirizzo,Attivita
+// Piu' righe con lo stesso Percorso + OrdineTappa = piu' attivita' per la stessa tappa.
+// Vedi il file percorsi-template.csv per un esempio compilabile.
+
+// Divide UNA riga di testo CSV nei singoli campi, gestendo correttamente
+// i campi tra virgolette che contengono virgole al loro interno
+// (es. "Mondavio, PU" non deve essere spezzato in due colonne).
+function parseCsvLine(line){
+  const out = [];
+  let cur = '';        // campo che si sta costruendo carattere per carattere
+  let inQuotes = false; // siamo dentro un campo tra virgolette?
+  for(let i = 0; i < line.length; i++){
+    const c = line[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(line[i+1] === '"'){ cur += '"'; i++; } // doppia virgoletta = virgoletta letterale
+        else { inQuotes = false; }                 // virgoletta di chiusura
+      } else { cur += c; }
+    } else {
+      if(c === '"'){ inQuotes = true; }        // apre un campo tra virgolette
+      else if(c === ','){ out.push(cur); cur = ''; } // fine campo: passa al successivo
+      else { cur += c; }
+    }
+  }
+  out.push(cur); // ultimo campo della riga
+  return out.map(s => s.trim());
+}
+
+// Legge il testo intero del file CSV e lo trasforma nell'array "routes"
+// nello stesso formato dei dati di esempio sopra. Lancia un errore (throw)
+// se manca una colonna obbligatoria o se il file è vuoto: l'errore viene
+// mostrato all'utente da handleCsvUpload più sotto.
+function parseRoutesCsv(text){
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+  if(lines.length < 2) throw new Error('Il file sembra vuoto.');
+
+  // prima riga = intestazione: capiamo in che colonna si trova ogni campo
+  // (così l'ordine delle colonne nel file non deve essere per forza fisso)
+  const header = parseCsvLine(lines[0]).map(h => h.toLowerCase());
+  const idx = {
+    percorso: header.indexOf('percorso'),
+    nome: header.indexOf('nomepercorso'),
+    ordine: header.indexOf('ordinetappa'),
+    tappa: header.indexOf('tappa'),
+    indirizzo: header.indexOf('indirizzo'),
+    attivita: header.indexOf('attivita')
+  };
+  const required = ['percorso','ordine','tappa','indirizzo','attivita'];
+  for(const key of required){
+    if(idx[key] === -1) throw new Error(`Colonna mancante nel CSV: ${key}`);
+  }
+
+  // routeMap raggruppa le righe per percorso, e dentro ogni percorso per numero di tappa
+  // (stopMap: ordine tappa -> {luogo, indirizzo, elenco attivita})
+  const routeMap = new Map();
+
+  for(let i = 1; i < lines.length; i++){
+    const cols = parseCsvLine(lines[i]);
+    const routeId = cols[idx.percorso];
+    if(!routeId) continue; // riga vuota o senza codice percorso: la ignoriamo
+    const routeName = idx.nome !== -1 && cols[idx.nome] ? cols[idx.nome] : `Percorso ${routeId}`;
+    const ordine = parseInt(cols[idx.ordine], 10);
+    const place = cols[idx.tappa];
+    const address = cols[idx.indirizzo];
+    const task = cols[idx.attivita];
+
+    if(!routeMap.has(routeId)){
+      routeMap.set(routeId, { id: routeId, name: routeName, stopMap: new Map() });
+    }
+    const r = routeMap.get(routeId);
+    if(!r.stopMap.has(ordine)){
+      r.stopMap.set(ordine, { place, address, tasks: [] });
+    }
+    // ogni riga aggiunge una attivita' alla tappa corrispondente (Percorso + OrdineTappa)
+    if(task) r.stopMap.get(ordine).tasks.push(task);
+  }
+
+  // trasforma la Map in un array ordinato per OrdineTappa, nel formato usato dal resto dell'app
+  const parsedRoutes = [];
+  routeMap.forEach(r => {
+    const orderedStops = Array.from(r.stopMap.entries())
+      .sort((a,b) => a[0] - b[0]) // ordina per numero di tappa (1, 2, 3...)
+      .map(entry => entry[1]);
+    const first = orderedStops[0]?.place || '';
+    const last = orderedStops[orderedStops.length - 1]?.place || '';
+    parsedRoutes.push({
+      id: r.id,
+      name: r.name,
+      meta: `${orderedStops.length} tappe · ${first} → ${last}`,
+      stops: orderedStops
+    });
+  });
+
+  if(parsedRoutes.length === 0) throw new Error('Nessun percorso trovato nel file.');
+  return parsedRoutes;
+}
+
+// Legge il contenuto di UN file come testo, restituendolo come Promise
+// (comodo per poter usare await dentro un ciclo su più file).
+function readFileAsText(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('impossibile leggere il file'));
+    reader.readAsText(file, 'UTF-8');
+  });
+}
+
+// Chiamata quando l'utente sceglie uno o PIÙ file dall'input "Carica CSV"
+// (l'input ha l'attributo "multiple", quindi event.target.files può contenerne diversi).
+// Ogni file viene letto e unito ai percorsi già salvati (mergeRoutes), uno dopo l'altro;
+// se un file ha un errore di formato, viene segnalato ma non blocca gli altri file
+// della stessa selezione. Alla fine si salva una sola volta e si ridisegna la home.
+async function handleCsvUpload(event){
+  const files = Array.from(event.target.files);
+  if(files.length === 0) return;
+
+  let routesTouched = 0;
+  const errors = [];
+
+  for(const file of files){
+    try{
+      const text = await readFileAsText(file);
+      const parsed = parseRoutesCsv(text);
+      mergeRoutes(parsed);
+      routesTouched += parsed.length;
+    } catch(err){
+      errors.push(`${file.name}: ${err.message}`);
+    }
+  }
+
+  saveRoutesToStorage();
+
+  if(errors.length > 0){
+    showCsvError(errors.join(' — '));
+  } else {
+    clearCsvError();
+  }
+
+  const fileWord = files.length === 1 ? 'file' : 'file';
+  document.getElementById('upload-status').textContent =
+    `${routes.length} percorsi salvati (${files.length} ${fileWord}, ${routesTouched} percorsi aggiornati/aggiunti)`;
+  renderHome();
+
+  // svuota la selezione dell'input: cosi' se l'utente ricarica di nuovo
+  // esattamente gli stessi file, l'evento onchange scatta comunque
+  event.target.value = '';
+}
+
+// Mostra un messaggio di errore rosso sotto al box di caricamento
+function showCsvError(msg){
+  clearCsvError();
+  const box = document.getElementById('upload-box');
+  const el = document.createElement('div');
+  el.className = 'csv-error';
+  el.id = 'csv-error';
+  el.textContent = 'Errore nel file: ' + msg;
+  box.parentElement.insertBefore(el, box.nextSibling);
+}
+function clearCsvError(){
+  const el = document.getElementById('csv-error');
+  if(el) el.remove();
+}
+
+// ---------------- RENDER: HOME ----------------
+// Ridisegna la lista dei percorsi nella home, leggendo l'array "routes"
+// e lo stato "progress" attuali. Va richiamata ogni volta che qualcosa
+// cambia (caricamento CSV, ritorno da un percorso, ecc.).
+function renderHome(){
+  const list = document.getElementById('route-list');
+  const manageRow = document.getElementById('manage-row');
+  list.innerHTML = ''; // svuota la lista prima di ridisegnarla
+
+  // ---- 1) riga di gestione: link "Seleziona per eliminare", oppure barra attiva ----
+  if(routes.length === 0){
+    manageRow.innerHTML = ''; // niente da gestire se non ci sono percorsi
+  } else if(!selectionMode){
+    manageRow.innerHTML = `
+      <div class="manage-row">
+        <button class="manage-link" onclick="toggleSelectionMode()">Seleziona per eliminare</button>
+      </div>`;
+  } else {
+    const n = selectedIds.size;
+    manageRow.innerHTML = `
+      <div class="manage-row">
+        <div class="selection-bar">
+          <div class="selection-count">${n} selezionat${n === 1 ? 'o' : 'i'}</div>
+          <div class="selection-actions">
+            <button class="btn-small" onclick="selectAllRoutes()">Tutti</button>
+            <button class="btn-small" onclick="toggleSelectionMode()">Annulla</button>
+            <button class="btn-small btn-small-danger" ${n === 0 ? 'disabled' : ''} onclick="deleteSelectedRoutes()">Elimina</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ---- 2) lista percorsi (o messaggio se vuota) ----
+  if(routes.length === 0){
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-title">Nessun percorso salvato</div>
+        <div class="empty-state-sub">Carica un file CSV per aggiungere il primo percorso.</div>
+      </div>`;
+    return;
+  }
+
+  routes.forEach(r => {
+    const done = progress[r.id];
+    const total = r.stops.length;
+    const isDone = done === total;
+    const isStarted = done > 0 && !isDone;
+
+    // il "pallino" a destra della card cambia colore/testo in base allo stato del percorso
+    const pillClass = isDone ? 'done' : (isStarted ? 'active' : '');
+    const pillText = isDone ? 'Completato' : `${done}/${total} tappe`;
+
+    const isSelected = selectedIds.has(r.id);
+
+    const card = document.createElement('div');
+    card.className = 'route-card' + (selectionMode ? ' selection-mode' : '') + (isSelected ? ' selected' : '');
+
+    // In modalità selezione il click spunta/despunta il percorso; altrimenti apre il dettaglio
+    card.onclick = () => {
+      if(selectionMode) toggleRouteSelected(r.id);
+      else openRoute(r.id);
+    };
+
+    // checkbox mostrata solo in modalità selezione, al posto del badge con l'id
+    const leftEl = selectionMode
+      ? `<div class="route-select-box">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+         </div>`
+      : `<div class="route-badge">${r.id}</div>`;
+
+    card.innerHTML = `
+      ${leftEl}
+      <div class="route-info">
+        <div class="route-name">${r.name}</div>
+        <div class="route-meta">${r.meta}</div>
+      </div>
+      ${selectionMode ? '' : `<div class="route-progress-pill ${pillClass}">${pillText}</div>`}
+    `;
+    list.appendChild(card);
+  });
+}
+
+// ---------------- NAVIGAZIONE TRA SCHERMATE ----------------
+// Apre il dettaglio di un percorso: nasconde la home, mostra la schermata
+// di dettaglio e la popola con renderRoute().
+function openRoute(id){
+  currentRouteId = id;
+  document.getElementById('screen-home').classList.add('hidden');
+  document.getElementById('screen-route').classList.remove('hidden');
+  renderRoute();
+}
+
+// Torna alla home da un percorso: percorso inverso di openRoute()
+function goHome(){
+  document.getElementById('screen-route').classList.add('hidden');
+  document.getElementById('screen-home').classList.remove('hidden');
+  renderHome();
+}
+
+// ---------------- RENDER: DETTAGLIO PERCORSO ----------------
+// Disegna la catena di tappe del percorso attualmente aperto (currentRouteId).
+// Per ogni tappa calcola lo stato (locked/active/done) confrontando il suo
+// indice con "progress[route.id]", poi genera l'HTML di conseguenza:
+// - tappe già passate (i < done)  -> stato "done"
+// - la tappa corrente (i == done) -> stato "active", con task cliccabili e pulsante Fatto
+// - tappe successive (i > done)   -> stato "locked", mostrate ma non interagibili
+function renderRoute(){
+  const route = routes.find(r => r.id === currentRouteId);
+  const done = progress[route.id];
+  const total = route.stops.length;
+
+  document.getElementById('route-eyebrow').textContent = `Percorso ${route.id}`;
+  document.getElementById('route-title').textContent = route.name;
+
+  // banner verde "percorso completato": visibile solo quando tutte le tappe sono fatte
+  const bannerSlot = document.getElementById('complete-banner-slot');
+  if(done === total){
+    bannerSlot.innerHTML = `
+      <div class="complete-banner">
+        <div class="complete-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <div>
+          <div class="complete-text-title">Percorso completato</div>
+          <div class="complete-text-sub">Tutte le tappe di ${route.name} sono state consegnate/ritirate.</div>
+        </div>
+      </div>`;
+  } else {
+    bannerSlot.innerHTML = '';
+  }
+
+  const chain = document.getElementById('stop-chain');
+  chain.innerHTML = ''; // svuota e ridisegna tutta la catena di tappe
+
+  // Ciclo su ogni tappa del percorso: "i" è l'indice (0, 1, 2...)
+  route.stops.forEach((stop, i) => {
+    // stato della tappa, calcolato confrontando il suo indice con quante ne sono state completate
+    const state = i < done ? 'done' : (i === done ? 'active' : 'locked');
+    const isLast = i === route.stops.length - 1; // ultima tappa = niente lineetta di collegamento dopo
+
+    const stopEl = document.createElement('div');
+    stopEl.className = 'stop';
+
+    // Il pallino mostra il numero della tappa, oppure una spunta se è completata
+    const dotLabel = state === 'done'
+      ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M20 6L9 17l-5-5"/></svg>`
+      : (i + 1);
+
+    // Link che apre la navigazione verso l'indirizzo della tappa in Google Maps
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(stop.address)}`;
+
+    const checks = taskProgress[route.id][i]; // array di booleani per questa tappa
+    const allChecked = checks.every(c => c === true); // tutte le attivita' spuntate?
+    const checkedCount = checks.filter(c => c).length; // quante ne mancano, per il contatore "1/2"
+
+    // ---- 1) genera l'HTML delle attività della tappa, in base allo stato ----
+    let tasksHtml = '';
+    if(state === 'active'){
+      // tappa corrente: ogni attivita' e' una riga cliccabile (chiama toggleTask al click)
+      tasksHtml = stop.tasks.map((t, ti) => `
+        <div class="stop-task-check ${checks[ti] ? 'checked' : ''}" onclick="toggleTask(${i}, ${ti})">
+          <div class="task-checkbox">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+          <div class="task-label">${t}</div>
+        </div>`).join('');
+    } else if(state === 'done'){
+      // tappa già completata: attivita' mostrate tutte spuntate, ma non più cliccabili
+      tasksHtml = stop.tasks.map(t => `
+        <div class="stop-task-check checked locked-task">
+          <div class="task-checkbox">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+          <div class="task-label">${t}</div>
+        </div>`).join('');
+    } else {
+      // tappa bloccata: solo testo semplice, nessuna interazione
+      tasksHtml = stop.tasks.map(t => `<div class="stop-task">${t}</div>`).join('');
+    }
+
+    // ---- 2) genera l'HTML dei pulsanti/azioni della tappa, in base allo stato ----
+    let actionsHtml = '';
+    if(state === 'active'){
+      // Pulsante "Fatto": cliccabile solo se allChecked è vero, altrimenti versione
+      // disabilitata con il conteggio (es. "Fatto (1/2)") — questo è il blocco
+      // richiesto: non si può completare la tappa finché non sono spuntate tutte le attività.
+      const doneBtn = allChecked
+        ? `<button class="btn btn-done" onclick="completeStop(${i})">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+             Fatto
+           </button>`
+        : `<div class="btn btn-done disabled">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+             Fatto (${checkedCount}/${checks.length})
+           </div>`;
+      actionsHtml = `
+        <div class="stop-actions">
+          <a class="btn btn-maps" href="${mapsUrl}" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+            Apri in Maps
+          </a>
+          ${doneBtn}
+        </div>`;
+      if(!allChecked){
+        actionsHtml = `<div class="tasks-hint">Spunta tutte le attività per abilitare "Fatto"</div>` + actionsHtml;
+      }
+    } else if(state === 'done'){
+      // tappa già confermata: mostra solo l'etichetta "Confermato", non più modificabile
+      actionsHtml = `
+        <div class="stop-actions">
+          <div class="btn btn-done-confirmed">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            Confermato
+          </div>
+        </div>`;
+    } else {
+      // tappa bloccata: nota con lucchetto, nessun pulsante
+      actionsHtml = `
+        <div class="locked-note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          Si sblocca dopo la tappa precedente
+        </div>`;
+    }
+
+    const statusText = state === 'done' ? 'Completata' : (state === 'active' ? 'Tappa attuale' : 'Bloccata');
+
+    // ---- 3) assembla la card della tappa e la aggiunge alla catena ----
+    stopEl.innerHTML = `
+      <div class="stop-rail">
+        <div class="stop-dot ${state}">${dotLabel}</div>
+        ${!isLast ? `<div class="stop-connector ${state === 'done' ? 'filled' : ''}"></div>` : ''}
+      </div>
+      <div class="stop-body">
+        <div class="stop-card ${state}">
+          <div class="stop-place">${stop.place}</div>
+          <div class="stop-status ${state}">${statusText}</div>
+          <div class="stop-tasks">
+            ${tasksHtml}
+          </div>
+          ${actionsHtml}
+        </div>
+      </div>
+    `;
+    chain.appendChild(stopEl);
+  });
+}
+
+// Chiamata al click su una singola attività (checkbox). Inverte lo stato
+// spuntato/non spuntato, ma SOLO se la tappa è quella attualmente attiva
+// (le tappe bloccate o già completate non sono modificabili).
+function toggleTask(stopIndex, taskIndex){
+  const route = routes.find(r => r.id === currentRouteId);
+  if(stopIndex !== progress[route.id]) return; // sicurezza: ignora click su tappe non attive
+  const checks = taskProgress[route.id][stopIndex];
+  checks[taskIndex] = !checks[taskIndex];
+  renderRoute(); // ridisegna per aggiornare la spunta e lo stato del pulsante "Fatto"
+}
+
+// Chiamata al click sul pulsante "Fatto". Fa avanzare il percorso alla
+// tappa successiva, ma solo se: 1) è davvero la tappa attiva, e
+// 2) tutte le sue attività sono state spuntate (doppio controllo, oltre
+// a quello visivo del pulsante disabilitato).
+function completeStop(index){
+  const route = routes.find(r => r.id === currentRouteId);
+  if(index !== progress[route.id]) return;
+  const checks = taskProgress[route.id][index];
+  const allChecked = checks.every(c => c === true);
+  if(!allChecked) return; // sicurezza: non completabile finche' mancano attivita'
+  progress[route.id] += 1; // sblocca la tappa successiva
+  renderRoute();
+}
+
+// Avvio dell'app: carica i percorsi salvati (se ci sono) e disegna la home
+initApp();
+</script>
+
+</body>
+</html>

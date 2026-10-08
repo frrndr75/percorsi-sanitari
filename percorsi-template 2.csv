@@ -1,0 +1,17 @@
+﻿Percorso,NomePercorso,OrdineTappa,Tappa,Indirizzo,Attivita
+H 2,Percorso H 2,1,Fossombrone,"Fossombrone, PU","Partenza: carico posta, due bussolotti con i ghiacci, materiale in ufficio o frigo laboratorio, ritiro farmacia per distretto o RSA."
+H 2,Percorso H 2,1,Fossombrone,"Fossombrone, PU",Verifica presenza di tutto il materiale prima di partire
+H 2,Percorso H 2,2,Mondavio,"Mondavio, PU","Consegna 2 bussolotti per ritiro prelievi, consegna e ritiro posta accetazione, consegna farmacia distretto o RSA piano di sopra"
+H 2,Percorso H 2,2,Mondavio,"Mondavio, PU",Verifica che sia tutto consegnato e ritirato.
+H 2,Percorso H 2,1,Pergola,Pergola,"Consegna al laboratorio analisi bussolotti mondavio, consegna posta da mondavio e ritiro posta per fossombrone-urbino-altro. "
+H 2,Percorso H 2,2,Pergola,Pergola,Ritiro bussolotto per Urbino
+H 2,Percorso H 2,3,Pergola,Pergola,Verifica che sia tutto consegnato e ritirato.
+H 2,Percorso H 2,1,Fossombrone,"Fossombrone, PU",Scarico bussolotti di Mondavio in ufficio e ghiacci nel congelatore lab.fossombrone
+H 2,Percorso H 2,2,Fossombrone,"Fossombrone, PU","Scarico posta in ufficio, trattengo solo quella di urbino"
+H 2,Percorso H 2,3,Fossombrone,"Fossombrone, PU",ritiro eventuale posta che deve andare a Urbino
+H 2,Percorso H 2,4,Fossombrone,"Fossombrone, PU",Ritiro bussolotto al lab fosso che devono andare lab  Urbino
+H 2,Percorso H 2,1,Urbino,Urbino,"Consegna al -1 laboratorio urbino, bussolotti di pergola e fossombrone"
+H 2,Percorso H 2,2,Urbino,Urbino,"ufficio trasporti sempre -1, ritiro bussolotti vuoti per la sterilizzazione, e posta,"
+H 2,Percorso H 2,3,Urbino,Urbino,"consegna posta ( DMO+accettazione+segreteria laboratorio,ect..)"
+H 2,Percorso H 2,4,Urbino,Urbino,"Ritiro ferri  al -2, ritiro farmacia per fossombrone"
+H 2,Percorso H 2,1,Fossombrone,"Fossombrone, PU",rientro a fossombrone con lascarico di tutto il materiale
